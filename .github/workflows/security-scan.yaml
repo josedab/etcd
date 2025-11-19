@@ -1,0 +1,90 @@
+# Security Scanning Workflow
+# Automated vulnerability scanning for etcd dependencies
+# RFC: RFC-0001-automated-vulnerability-scanning.md
+
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, release-*]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: |
+          echo "Running govulncheck on all modules..."
+          govulncheck ./... 2>&1 | tee vuln-report.txt
+          exit_code=${PIPESTATUS[0]}
+
+          if [ $exit_code -ne 0 ]; then
+            echo "::error::Vulnerabilities found in dependencies"
+            exit 1
+          fi
+
+          echo "No vulnerabilities found"
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vulnerability-report
+          path: vuln-report.txt
+          retention-days: 30
+
+  # Scan additional modules in the repository
+  govulncheck-tools:
+    name: Vulnerability Check (Tools)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck on tools
+        run: |
+          echo "Running govulncheck on tools module..."
+          cd tools/mod
+          govulncheck ./... 2>&1 | tee ../../vuln-report-tools.txt
+          exit_code=${PIPESTATUS[0]}
+
+          if [ $exit_code -ne 0 ]; then
+            echo "::error::Vulnerabilities found in tools dependencies"
+            exit 1
+          fi
+
+          echo "No vulnerabilities found in tools"
+
+      - name: Upload tools vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vulnerability-report-tools
+          path: vuln-report-tools.txt
+          retention-days: 30

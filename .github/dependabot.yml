@@ -12,6 +12,15 @@ updates:
       interval: weekly
     allow:
       - dependency-type: all
+    groups:
+      security:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+    labels:
+      - "dependencies"
+      - "security"
 
   - package-ecosystem: gomod
     directory: /tools/mod # Not linked from /go.mod

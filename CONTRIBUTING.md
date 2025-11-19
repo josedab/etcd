@@ -149,6 +149,21 @@ Please ensure that your change passes tests.
 All changes are expected to come with a unit test.
 All new features are expected to have either e2e or integration tests.
 
+### Security checks
+
+Please ensure that your change passes security checks, especially when adding or updating dependencies:
+
+- `make vuln-check` to run vulnerability scanning using govulncheck.
+- `make security` to run all security checks.
+
+The CI pipeline automatically runs vulnerability scanning on all pull requests and weekly on the main branch. If vulnerabilities are detected:
+
+1. Check if the vulnerability affects etcd's usage of the dependency
+2. Update the dependency to a patched version if available
+3. If no patch is available, document the risk and consider alternatives
+
+For more information about the Go vulnerability database, see [vuln.go.dev](https://vuln.go.dev/).
+
 ## Commit your change
 
 etcd follows a rough convention for commit messages:

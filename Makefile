@@ -179,6 +179,18 @@ fix-yamllint:
 run-govulncheck:
 	PASSES="govuln" ./scripts/test.sh
 
+# Security scanning
+.PHONY: vuln-check
+vuln-check:
+	@echo "Running vulnerability check..."
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@govulncheck ./...
+
+.PHONY: security
+security: vuln-check
+	@echo "Security checks completed."
+	@echo "Future: Additional security tools can be added here"
+
 # Tools
 
 .PHONY: install-golangci-lint
