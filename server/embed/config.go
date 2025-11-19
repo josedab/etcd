@@ -106,6 +106,9 @@ const (
 	// DefaultDistributedTracingServiceName is the default etcd service name.
 	DefaultDistributedTracingServiceName = "etcd"
 
+	// DefaultDashboardAddr is the default address for the dashboard server.
+	DefaultDashboardAddr = ":8080"
+
 	// DefaultStrictReconfigCheck is the default value for "--strict-reconfig-check" flag.
 	// It's enabled by default.
 	DefaultStrictReconfigCheck = true
@@ -402,6 +405,12 @@ type Config struct {
 	// Defaults to 0.
 	DistributedTracingSamplingRatePerMillion int `json:"distributed-tracing-sampling-rate"`
 
+	// EnableDashboard enables the built-in web dashboard for cluster monitoring.
+	EnableDashboard bool `json:"enable-dashboard"`
+	// DashboardAddr is the address to listen for the dashboard server.
+	// Can only be set if EnableDashboard is true.
+	DashboardAddr string `json:"dashboard-addr"`
+
 	// Logger is logger options: currently only supports "zap".
 	// "capnslog" is removed in v3.5.
 	Logger string `json:"logger"`
@@ -566,6 +575,8 @@ func NewConfig() *Config {
 
 		DistributedTracingAddress:     DefaultDistributedTracingAddress,
 		DistributedTracingServiceName: DefaultDistributedTracingServiceName,
+
+		DashboardAddr: DefaultDashboardAddr,
 
 		CompactHashCheckTime: DefaultCompactHashCheckTime,
 
@@ -735,6 +746,10 @@ func (cfg *Config) AddFlags(fs *flag.FlagSet) {
 	fs.StringVar(&cfg.DistributedTracingServiceName, "distributed-tracing-service-name", cfg.DistributedTracingServiceName, "Configures service name for distributed tracing to be used to define service name for OpenTelemetry Tracing (if enabled with enable-distributed-tracing flag). 'etcd' is the default service name. Use the same service name for all instances of etcd.")
 	fs.StringVar(&cfg.DistributedTracingServiceInstanceID, "distributed-tracing-instance-id", "", "Configures service instance ID for distributed tracing to be used to define service instance ID key for OpenTelemetry Tracing (if enabled with enable-distributed-tracing flag). There is no default value set. This ID must be unique per etcd instance.")
 	fs.IntVar(&cfg.DistributedTracingSamplingRatePerMillion, "distributed-tracing-sampling-rate", 0, "Number of samples to collect per million spans for OpenTelemetry Tracing (if enabled with enable-distributed-tracing flag).")
+
+	// dashboard
+	fs.BoolVar(&cfg.EnableDashboard, "enable-dashboard", false, "Enable the built-in web dashboard for cluster monitoring.")
+	fs.StringVar(&cfg.DashboardAddr, "dashboard-addr", cfg.DashboardAddr, "Address to listen for the dashboard server (if enabled with enable-dashboard flag).")
 
 	// auth
 	fs.StringVar(&cfg.AuthToken, "auth-token", cfg.AuthToken, "Specify auth token specific options.")

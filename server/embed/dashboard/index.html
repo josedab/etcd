@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>etcd Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>etcd Dashboard</h1>
+        <span id="cluster-health" class="health-badge">Loading...</span>
+    </header>
+
+    <main>
+        <section id="overview" class="section">
+            <h2>Overview</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Cluster ID</div>
+                    <div class="metric-value" id="cluster-id">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Member ID</div>
+                    <div class="metric-value" id="member-id">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Leader ID</div>
+                    <div class="metric-value" id="leader-id">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Version</div>
+                    <div class="metric-value" id="version">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Members</div>
+                    <div class="metric-value" id="members-count">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">DB Size</div>
+                    <div class="metric-value" id="db-size">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">DB Size In Use</div>
+                    <div class="metric-value" id="db-size-in-use">-</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="members" class="section">
+            <h2>Cluster Members</h2>
+            <div class="table-container">
+                <table id="members-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Role</th>
+                            <th>Peer URLs</th>
+                            <th>Client URLs</th>
+                        </tr>
+                    </thead>
+                    <tbody id="members-tbody">
+                        <tr>
+                            <td colspan="5">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="metrics" class="section">
+            <h2>Key Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Proposals Committed</div>
+                    <div class="metric-value" id="proposals-committed">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Proposals Failed</div>
+                    <div class="metric-value" id="proposals-failed">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Leader Changes</div>
+                    <div class="metric-value" id="leader-changes">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Keys Total</div>
+                    <div class="metric-value" id="keys-total">-</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Last updated: <span id="last-updated">-</span></p>
+    </footer>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

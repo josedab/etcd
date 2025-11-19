@@ -287,6 +287,15 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		return e, err
 	}
 
+	if err = e.serveDashboard(); err != nil {
+		return e, err
+	}
+
+	dashboardAddr := ""
+	if e.cfg.EnableDashboard {
+		dashboardAddr = e.cfg.DashboardAddr
+	}
+
 	e.cfg.logger.Info(
 		"now serving peer/client/metrics",
 		zap.String("local-member-id", e.Server.MemberID().String()),
@@ -295,6 +304,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		zap.Strings("advertise-client-urls", e.cfg.getAdvertiseClientURLs()),
 		zap.Strings("listen-client-urls", e.cfg.getListenClientURLs()),
 		zap.Strings("listen-metrics-urls", e.cfg.getMetricsURLs()),
+		zap.String("dashboard-addr", dashboardAddr),
 	)
 	serving = true
 	return e, nil
