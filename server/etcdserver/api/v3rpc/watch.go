@@ -412,8 +412,16 @@ func (sws *serverWatchStream) sendLoop() {
 	interval := GetProgressReportInterval()
 	progressTicker := time.NewTicker(interval)
 
+	// Initialize adaptive batcher for event batching
+	batchCfg := DefaultWatchBatchConfig()
+	batcher := newAdaptiveBatcher(batchCfg)
+
+	// Track batch start time for latency metrics
+	var batchStartTime time.Time
+
 	defer func() {
 		progressTicker.Stop()
+		batcher.stop()
 		// drain the chan to clean up pending events
 		for ws := range sws.watchStream.Chan() {
 			mvcc.ReportEventReceived(len(ws.Events))
@@ -473,26 +481,43 @@ func (sws *serverWatchStream) sendLoop() {
 
 			mvcc.ReportEventReceived(len(evs))
 
-			sws.mu.RLock()
-			fragmented, ok := sws.fragment[wresp.WatchID]
-			sws.mu.RUnlock()
+			// Handle progress notifications and canceled watches immediately (don't batch)
+			if len(events) == 0 || canceled {
+				sws.mu.RLock()
+				fragmented, ok := sws.fragment[wresp.WatchID]
+				sws.mu.RUnlock()
 
-			var serr error
-			// gofail: var beforeSendWatchResponse struct{}
-			if !fragmented && !ok {
-				serr = sws.gRPCStream.Send(wr)
-			} else {
-				serr = sendFragments(wr, sws.maxRequestBytes, sws.gRPCStream.Send)
+				var serr error
+				if !fragmented && !ok {
+					serr = sws.gRPCStream.Send(wr)
+				} else {
+					serr = sendFragments(wr, sws.maxRequestBytes, sws.gRPCStream.Send)
+				}
+
+				if serr != nil {
+					if isClientCtxErr(sws.gRPCStream.Context().Err(), serr) {
+						sws.lg.Debug("failed to send watch response to gRPC stream", zap.Error(serr))
+					} else {
+						sws.lg.Warn("failed to send watch response to gRPC stream", zap.Error(serr))
+						streamFailures.WithLabelValues("send", "watch").Inc()
+					}
+					return
+				}
+				continue
 			}
 
-			if serr != nil {
-				if isClientCtxErr(sws.gRPCStream.Context().Err(), serr) {
-					sws.lg.Debug("failed to send watch response to gRPC stream", zap.Error(serr))
-				} else {
-					sws.lg.Warn("failed to send watch response to gRPC stream", zap.Error(serr))
-					streamFailures.WithLabelValues("send", "watch").Inc()
+			// Track batch start time for latency metrics
+			if batchStartTime.IsZero() {
+				batchStartTime = time.Now()
+			}
+
+			// Add to batch
+			if batcher.add(wr) {
+				// Threshold reached, flush immediately
+				if err := sws.sendBatch(batcher.flush(), batchStartTime); err != nil {
+					return
 				}
-				return
+				batchStartTime = time.Time{}
 			}
 
 			sws.mu.Lock()
@@ -501,6 +526,15 @@ func (sws *serverWatchStream) sendLoop() {
 				sws.progress[wresp.WatchID] = false
 			}
 			sws.mu.Unlock()
+
+		case <-batcher.timerChan():
+			// Timer expired, flush batch
+			if responses := batcher.flush(); len(responses) > 0 {
+				if err := sws.sendBatch(responses, batchStartTime); err != nil {
+					return
+				}
+				batchStartTime = time.Time{}
+			}
 
 		case c, ok := <-sws.ctrlStream:
 			if !ok {
@@ -558,6 +592,57 @@ func (sws *serverWatchStream) sendLoop() {
 			return
 		}
 	}
+}
+
+// sendBatch sends a batch of watch responses, merging them for efficiency.
+func (sws *serverWatchStream) sendBatch(responses []*pb.WatchResponse, batchStartTime time.Time) error {
+	if len(responses) == 0 {
+		return nil
+	}
+
+	// Merge responses for same watch IDs
+	merged := mergeWatchResponses(responses)
+
+	// Record metrics
+	totalEvents := 0
+	for _, wr := range merged {
+		totalEvents += len(wr.Events)
+	}
+
+	if totalEvents > 0 {
+		watchBatchSize.Observe(float64(totalEvents))
+		if !batchStartTime.IsZero() {
+			watchBatchLatency.Observe(time.Since(batchStartTime).Seconds())
+		}
+		watchBatchesTotal.Inc()
+	}
+
+	// Send each merged response
+	for _, wr := range merged {
+		sws.mu.RLock()
+		fragmented, ok := sws.fragment[mvcc.WatchID(wr.WatchId)]
+		sws.mu.RUnlock()
+
+		var serr error
+		// gofail: var beforeSendWatchResponse struct{}
+		if !fragmented && !ok {
+			serr = sws.gRPCStream.Send(wr)
+		} else {
+			serr = sendFragments(wr, sws.maxRequestBytes, sws.gRPCStream.Send)
+		}
+
+		if serr != nil {
+			if isClientCtxErr(sws.gRPCStream.Context().Err(), serr) {
+				sws.lg.Debug("failed to send watch response to gRPC stream", zap.Error(serr))
+			} else {
+				sws.lg.Warn("failed to send watch response to gRPC stream", zap.Error(serr))
+				streamFailures.WithLabelValues("send", "watch").Inc()
+			}
+			return serr
+		}
+	}
+
+	return nil
 }
 
 func IsCreateEvent(e mvccpb.Event) bool {

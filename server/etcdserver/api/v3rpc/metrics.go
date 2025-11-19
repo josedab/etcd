@@ -52,6 +52,30 @@ var (
 		},
 		[]string{"type", "client_api_version"},
 	)
+
+	// Watch batching metrics
+	watchBatchSize = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "watch",
+		Name:      "batch_size",
+		Help:      "Size of watch event batches sent.",
+		Buckets:   []float64{1, 10, 50, 100, 500, 1000},
+	})
+
+	watchBatchLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "watch",
+		Name:      "batch_latency_seconds",
+		Help:      "Time events wait in batch before sending.",
+		Buckets:   []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
+	})
+
+	watchBatchesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "watch",
+		Name:      "batches_total",
+		Help:      "Total number of watch batches sent.",
+	})
 )
 
 func init() {
@@ -59,4 +83,7 @@ func init() {
 	prometheus.MustRegister(receivedBytes)
 	prometheus.MustRegister(streamFailures)
 	prometheus.MustRegister(clientRequests)
+	prometheus.MustRegister(watchBatchSize)
+	prometheus.MustRegister(watchBatchLatency)
+	prometheus.MustRegister(watchBatchesTotal)
 }
