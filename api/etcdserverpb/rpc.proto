@@ -1434,3 +1434,26 @@ message AuthRoleRevokePermissionResponse {
 
   ResponseHeader header = 1;
 }
+
+// ErrorDetail provides structured error context for debugging.
+// This message is attached to gRPC status details when errors occur.
+message ErrorDetail {
+  option (versionpb.etcd_version_msg) = "3.6";
+
+  // request_id is a unique identifier for the request that caused the error.
+  string request_id = 1;
+  // member_id is the ID of the member that processed the request.
+  uint64 member_id = 2;
+  // operation is the type of operation that was attempted (e.g., "Put", "Range").
+  string operation = 3;
+  // key is the key involved in the operation (truncated to 50 chars for security).
+  string key = 4;
+  // duration_ms is how long the operation took before failing.
+  int64 duration_ms = 5;
+  // leader_id is the current leader ID at the time of error.
+  uint64 leader_id = 6;
+  // cause is a machine-readable error classification.
+  string cause = 7;
+  // retry_after_ms suggests how long the client should wait before retrying.
+  int64 retry_after_ms = 8;
+}

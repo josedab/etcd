@@ -17,6 +17,7 @@ package v3rpc
 
 import (
 	"context"
+	"time"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
@@ -27,6 +28,8 @@ import (
 type kvServer struct {
 	hdr header
 	kv  etcdserver.RaftKV
+	// server holds reference to EtcdServer for error context
+	server *etcdserver.EtcdServer
 	// maxTxnOps is the max operations per txn.
 	// e.g suppose maxTxnOps = 128.
 	// Txn.Success can have at most 128 operations,
@@ -35,7 +38,29 @@ type kvServer struct {
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {
-	return &kvServer{hdr: newHeader(s), kv: s, maxTxnOps: s.Cfg.MaxTxnOps}
+	return &kvServer{hdr: newHeader(s), kv: s, server: s, maxTxnOps: s.Cfg.MaxTxnOps}
+}
+
+// wrapErrorWithContext wraps an error with structured context for debugging.
+func (s *kvServer) wrapErrorWithContext(err error, operation string, key string, start time.Time) error {
+	if err == nil {
+		return nil
+	}
+
+	grpcErr := togRPCError(err)
+
+	ctx := &rpctypes.ErrorContext{
+		RequestID:  rpctypes.GenerateRequestID(),
+		MemberID:   uint64(s.hdr.memberID),
+		Operation:  operation,
+		Key:        rpctypes.TruncateKey(key, 50, rpctypes.IsAuthError(grpcErr)),
+		Duration:   time.Since(start),
+		LeaderID:   uint64(s.server.Leader()),
+		Cause:      rpctypes.ClassifyError(grpcErr),
+		RetryAfter: rpctypes.GetRetryAfter(grpcErr),
+	}
+
+	return rpctypes.ErrorWithContext(grpcErr, ctx)
 }
 
 func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResponse, error) {
@@ -43,9 +68,10 @@ func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResp
 		return nil, err
 	}
 
+	start := time.Now()
 	resp, err := s.kv.Range(ctx, r)
 	if err != nil {
-		return nil, togRPCError(err)
+		return nil, s.wrapErrorWithContext(err, "Range", string(r.Key), start)
 	}
 
 	s.hdr.fill(resp.Header)
@@ -57,9 +83,10 @@ func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, 
 		return nil, err
 	}
 
+	start := time.Now()
 	resp, err := s.kv.Put(ctx, r)
 	if err != nil {
-		return nil, togRPCError(err)
+		return nil, s.wrapErrorWithContext(err, "Put", string(r.Key), start)
 	}
 
 	s.hdr.fill(resp.Header)
@@ -71,9 +98,10 @@ func (s *kvServer) DeleteRange(ctx context.Context, r *pb.DeleteRangeRequest) (*
 		return nil, err
 	}
 
+	start := time.Now()
 	resp, err := s.kv.DeleteRange(ctx, r)
 	if err != nil {
-		return nil, togRPCError(err)
+		return nil, s.wrapErrorWithContext(err, "DeleteRange", string(r.Key), start)
 	}
 
 	s.hdr.fill(resp.Header)
@@ -92,9 +120,15 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 		return nil, err
 	}
 
+	start := time.Now()
 	resp, err := s.kv.Txn(ctx, r)
 	if err != nil {
-		return nil, togRPCError(err)
+		// Use first compare key for context, or empty if none
+		key := ""
+		if len(r.Compare) > 0 {
+			key = string(r.Compare[0].Key)
+		}
+		return nil, s.wrapErrorWithContext(err, "Txn", key, start)
 	}
 
 	s.hdr.fill(resp.Header)
@@ -102,9 +136,10 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 }
 
 func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.CompactionResponse, error) {
+	start := time.Now()
 	resp, err := s.kv.Compact(ctx, r)
 	if err != nil {
-		return nil, togRPCError(err)
+		return nil, s.wrapErrorWithContext(err, "Compact", "", start)
 	}
 
 	s.hdr.fill(resp.Header)
