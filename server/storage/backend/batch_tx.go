@@ -28,47 +28,7 @@ import (
 	bolterrors "go.etcd.io/bbolt/errors"
 )
 
-type BucketID int
-
-type Bucket interface {
-	// ID returns a unique identifier of a bucket.
-	// The id must NOT be persisted and can be used as lightweight identificator
-	// in the in-memory maps.
-	ID() BucketID
-	Name() []byte
-	// String implements Stringer (human readable name).
-	String() string
-
-	// IsSafeRangeBucket is a hack to avoid inadvertently reading duplicate keys;
-	// overwrites on a bucket should only fetch with limit=1, but safeRangeBucket
-	// is known to never overwrite any key so range is safe.
-	IsSafeRangeBucket() bool
-}
-
-type BatchTx interface {
-	Lock()
-	Unlock()
-	// Commit commits a previous tx and begins a new writable one.
-	Commit()
-	// CommitAndStop commits the previous tx and does not create a new one.
-	CommitAndStop()
-	LockInsideApply()
-	LockOutsideApply()
-	UnsafeReadWriter
-}
-
-type UnsafeReadWriter interface {
-	UnsafeReader
-	UnsafeWriter
-}
-
-type UnsafeWriter interface {
-	UnsafeCreateBucket(bucket Bucket)
-	UnsafeDeleteBucket(bucket Bucket)
-	UnsafePut(bucket Bucket, key []byte, value []byte)
-	UnsafeSeqPut(bucket Bucket, key []byte, value []byte)
-	UnsafeDelete(bucket Bucket, key []byte)
-}
+// BucketID, Bucket, BatchTx, UnsafeReadWriter, UnsafeWriter interfaces are defined in interface.go
 
 type batchTx struct {
 	sync.Mutex

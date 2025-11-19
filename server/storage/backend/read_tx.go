@@ -21,20 +21,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// IsSafeRangeBucket is a hack to avoid inadvertently reading duplicate keys;
-// overwrites on a bucket should only fetch with limit=1, but IsSafeRangeBucket
-// is known to never overwrite any key so range is safe.
-
-type ReadTx interface {
-	RLock()
-	RUnlock()
-	UnsafeReader
-}
-
-type UnsafeReader interface {
-	UnsafeRange(bucket Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
-	UnsafeForEach(bucket Bucket, visitor func(k, v []byte) error) error
-}
+// ReadTx and UnsafeReader interfaces are defined in interface.go
 
 // Base type for readTx and concurrentReadTx to eliminate duplicate functions between these
 type baseReadTx struct {

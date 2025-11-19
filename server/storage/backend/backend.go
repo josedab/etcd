@@ -17,7 +17,6 @@ package backend
 import (
 	"fmt"
 	"hash/crc32"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -46,42 +45,7 @@ var (
 	minSnapshotWarningTimeout = 30 * time.Second
 )
 
-type Backend interface {
-	// ReadTx returns a read transaction. It is replaced by ConcurrentReadTx in the main data path, see #10523.
-	ReadTx() ReadTx
-	BatchTx() BatchTx
-	// ConcurrentReadTx returns a non-blocking read transaction.
-	ConcurrentReadTx() ReadTx
-
-	Snapshot() Snapshot
-	Hash(ignores func(bucketName, keyName []byte) bool) (uint32, error)
-	// Size returns the current size of the backend physically allocated.
-	// The backend can hold DB space that is not utilized at the moment,
-	// since it can conduct pre-allocation or spare unused space for recycling.
-	// Use SizeInUse() instead for the actual DB size.
-	Size() int64
-	// SizeInUse returns the current size of the backend logically in use.
-	// Since the backend can manage free space in a non-byte unit such as
-	// number of pages, the returned value can be not exactly accurate in bytes.
-	SizeInUse() int64
-	// OpenReadTxN returns the number of currently open read transactions in the backend.
-	OpenReadTxN() int64
-	Defrag() error
-	ForceCommit()
-	Close() error
-
-	// SetTxPostLockInsideApplyHook sets a txPostLockInsideApplyHook.
-	SetTxPostLockInsideApplyHook(func())
-}
-
-type Snapshot interface {
-	// Size gets the size of the snapshot.
-	Size() int64
-	// WriteTo writes the snapshot into the given writer.
-	WriteTo(w io.Writer) (n int64, err error)
-	// Close closes the snapshot.
-	Close() error
-}
+// Backend, ReadTx, BatchTx, Snapshot interfaces are defined in interface.go
 
 type txReadBufferCache struct {
 	mu         sync.Mutex
@@ -131,6 +95,9 @@ type backend struct {
 }
 
 type BackendConfig struct {
+	// Type specifies the backend type to use (e.g., "bolt", "memory").
+	// If empty, defaults to "bolt".
+	Type BackendType
 	// Path is the file path to the backend file.
 	Path string
 	// BatchInterval is the maximum time before flushing the BatchTx.
@@ -153,6 +120,10 @@ type BackendConfig struct {
 
 	// Hooks are getting executed during lifecycle of Backend's transactions.
 	Hooks Hooks
+
+	// ExtraConfig provides backend-specific configuration as key-value pairs.
+	// This allows passing custom configuration to alternative backend implementations.
+	ExtraConfig map[string]string
 }
 
 type BackendConfigOption func(*BackendConfig)
