@@ -8,7 +8,6 @@ require (
 	github.com/alexfalkowski/gocovmerge v1.11.0
 	github.com/appscodelabs/license-bill-of-materials v0.0.0-20220707232035-6018e0c5287c
 	github.com/cloudflare/cfssl v1.6.5
-	github.com/gogo/protobuf v1.3.2
 	github.com/golangci/golangci-lint/v2 v2.6.0
 	github.com/google/yamlfmt v0.20.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3
@@ -17,6 +16,8 @@ require (
 	go.etcd.io/protodoc v0.0.0-20180829002748-484ab544e116
 	go.etcd.io/raft/v3 v3.6.0
 	golang.org/x/tools v0.38.0
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
+	google.golang.org/protobuf v1.36.10
 	gotest.tools/gotestsum v1.13.0
 	gotest.tools/v3 v3.5.2
 	honnef.co/go/tools v0.6.1

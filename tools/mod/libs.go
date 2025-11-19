@@ -21,5 +21,5 @@
 package libs
 
 import (
-	_ "github.com/gogo/protobuf/proto"
+	_ "google.golang.org/protobuf/proto"
 )
