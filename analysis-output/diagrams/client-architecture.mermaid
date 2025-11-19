@@ -1,0 +1,82 @@
+%% etcd Client Architecture
+%% Commit: d6bc3229d81384aed0fc03a3ddd3dccfef092048
+
+graph TB
+    subgraph "Application"
+        APP[Your Application]
+    end
+
+    subgraph "Client v3"
+        CLIENT[Client<br/>client.go]
+
+        subgraph "Core APIs"
+            KV[KV<br/>kv.go]
+            LEASE[Lease<br/>lease.go]
+            WATCH[Watcher<br/>watch.go]
+            CLUSTER[Cluster<br/>cluster.go]
+            AUTH[Auth<br/>auth.go]
+            MAINT[Maintenance<br/>maintenance.go]
+        end
+
+        subgraph "Higher-Level APIs"
+            MUTEX[Mutex<br/>concurrency/mutex.go]
+            ELECTION[Election<br/>concurrency/election.go]
+            STM[STM<br/>concurrency/stm.go]
+        end
+
+        subgraph "Connection Management"
+            RESOLVER[Resolver<br/>resolver/]
+            BALANCER[Balancer<br/>Round-robin]
+            RETRY[Retry<br/>Interceptor]
+        end
+
+        GRPC[gRPC Connection]
+    end
+
+    subgraph "etcd Cluster"
+        S1[Member 1]
+        S2[Member 2]
+        S3[Member 3]
+    end
+
+    %% Application to Client
+    APP --> CLIENT
+    APP --> MUTEX
+    APP --> ELECTION
+
+    %% Client to APIs
+    CLIENT --> KV
+    CLIENT --> LEASE
+    CLIENT --> WATCH
+    CLIENT --> CLUSTER
+    CLIENT --> AUTH
+    CLIENT --> MAINT
+
+    %% Higher-level to core
+    MUTEX --> KV
+    MUTEX --> LEASE
+    ELECTION --> KV
+    ELECTION --> LEASE
+    STM --> KV
+
+    %% Connection management
+    CLIENT --> GRPC
+    GRPC --> RESOLVER
+    RESOLVER --> BALANCER
+    BALANCER --> RETRY
+    RETRY --> S1
+    RETRY --> S2
+    RETRY --> S3
+
+    %% Styling
+    classDef app fill:#e1f5fe,stroke:#01579b
+    classDef core fill:#f3e5f5,stroke:#4a148c
+    classDef highlevel fill:#fff3e0,stroke:#e65100
+    classDef conn fill:#e8f5e9,stroke:#1b5e20
+    classDef server fill:#fce4ec,stroke:#880e4f
+
+    class APP app
+    class CLIENT,KV,LEASE,WATCH,CLUSTER,AUTH,MAINT core
+    class MUTEX,ELECTION,STM highlevel
+    class RESOLVER,BALANCER,RETRY,GRPC conn
+    class S1,S2,S3 server

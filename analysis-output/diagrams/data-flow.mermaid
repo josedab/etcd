@@ -1,0 +1,66 @@
+%% etcd Data Flow - Write and Read Paths
+%% Commit: d6bc3229d81384aed0fc03a3ddd3dccfef092048
+
+sequenceDiagram
+    participant C as Client
+    participant G as gRPC Handler
+    participant S as EtcdServer
+    participant R as Raft
+    participant W as WAL
+    participant P as Peers
+    participant A as Applier
+    participant M as MVCC Store
+    participant B as BoltDB
+
+    Note over C,B: Write Path (Put)
+
+    C->>G: Put(key, value)
+    G->>G: Validate request
+    G->>S: Process Put
+    S->>R: Propose entry
+
+    par Durability
+        R->>W: Write WAL entry
+        W->>W: fsync()
+    and Replication
+        R->>P: Append entries
+        P-->>R: Acknowledge
+    end
+
+    R->>R: Entry committed
+    R->>S: Ready to apply
+    S->>A: Apply entry
+    A->>M: Put to store
+    M->>M: Update index
+    M->>B: Batch write
+    B->>B: Commit tx
+    A-->>S: Applied
+    S-->>G: Response
+    G-->>C: PutResponse
+
+    Note over C,B: Read Path (Linearizable)
+
+    C->>G: Get(key)
+    G->>S: Range request
+    S->>R: Read index
+    R->>P: Heartbeat (confirm leader)
+    P-->>R: Acknowledge
+    R-->>S: Read state
+    S->>S: Wait for apply index
+    S->>M: Range query
+    M->>B: Read from backend
+    B-->>M: Key-Value
+    M-->>S: Result
+    S-->>G: Response
+    G-->>C: RangeResponse
+
+    Note over C,B: Read Path (Serializable)
+
+    C->>G: Get(key, serializable)
+    G->>S: Range request
+    S->>M: Range query (direct)
+    M->>B: Read from backend
+    B-->>M: Key-Value
+    M-->>S: Result
+    S-->>G: Response
+    G-->>C: RangeResponse

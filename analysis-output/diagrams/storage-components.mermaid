@@ -1,0 +1,77 @@
+%% etcd Storage Layer Components
+%% Commit: d6bc3229d81384aed0fc03a3ddd3dccfef092048
+
+graph TB
+    subgraph "MVCC Store"
+        STORE[store<br/>kvstore.go]
+        INDEX[treeIndex<br/>B-tree in memory]
+        KEYIDX[keyIndex<br/>Per-key history]
+    end
+
+    subgraph "Watch System"
+        WATCH[watchableStore<br/>watchable_store.go]
+        SYNCED[synced watchers]
+        UNSYNCED[unsynced watchers]
+        VICTIMS[victim watchers]
+    end
+
+    subgraph "Backend (BoltDB)"
+        BE[Backend<br/>backend.go]
+        BATCHTX[BatchTx<br/>Write buffer]
+        READTX[ReadTx<br/>Read cache]
+        BOLT[(BoltDB File<br/>B+tree)]
+    end
+
+    subgraph "Write-Ahead Log"
+        WAL[WAL<br/>wal.go]
+        ENCODER[Encoder<br/>Record encoding]
+        SEGMENTS[Segment Files<br/>64MB each]
+    end
+
+    subgraph "Snapshots"
+        SNAP[Snapshotter<br/>snap/]
+        SNAPDB[(Snapshot Files)]
+    end
+
+    %% MVCC relationships
+    STORE --> INDEX
+    INDEX --> KEYIDX
+    STORE --> WATCH
+
+    %% Watch relationships
+    WATCH --> SYNCED
+    WATCH --> UNSYNCED
+    WATCH --> VICTIMS
+
+    %% Backend relationships
+    STORE --> BE
+    BE --> BATCHTX
+    BE --> READTX
+    BATCHTX --> BOLT
+    READTX --> BOLT
+
+    %% WAL relationships
+    WAL --> ENCODER
+    ENCODER --> SEGMENTS
+
+    %% Snapshot relationships
+    BE --> SNAP
+    SNAP --> SNAPDB
+
+    %% Data flow annotations
+    STORE -. "Put/Delete" .-> BATCHTX
+    STORE -. "Get/Range" .-> READTX
+    WATCH -. "Events" .-> SYNCED
+
+    %% Styling
+    classDef mvcc fill:#e3f2fd,stroke:#1565c0
+    classDef watch fill:#f3e5f5,stroke:#7b1fa2
+    classDef backend fill:#fff8e1,stroke:#f57f17
+    classDef wal fill:#e8f5e9,stroke:#2e7d32
+    classDef snap fill:#fce4ec,stroke:#c2185b
+
+    class STORE,INDEX,KEYIDX mvcc
+    class WATCH,SYNCED,UNSYNCED,VICTIMS watch
+    class BE,BATCHTX,READTX,BOLT backend
+    class WAL,ENCODER,SEGMENTS wal
+    class SNAP,SNAPDB snap

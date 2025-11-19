@@ -1,0 +1,46 @@
+%% etcd Raft Consensus Flow
+%% Commit: d6bc3229d81384aed0fc03a3ddd3dccfef092048
+
+stateDiagram-v2
+    [*] --> Follower: Initial state
+
+    state Follower {
+        [*] --> Waiting
+        Waiting --> Waiting: Receive heartbeat
+        Waiting --> Election: Election timeout
+    }
+
+    state Candidate {
+        [*] --> RequestVotes
+        RequestVotes --> WaitVotes: Send to peers
+        WaitVotes --> Won: Majority votes
+        WaitVotes --> Lost: Higher term seen
+        WaitVotes --> Timeout: Election timeout
+    }
+
+    state Leader {
+        [*] --> Active
+        Active --> Active: Send heartbeats
+        Active --> Replicate: Client request
+        Replicate --> Commit: Majority ack
+        Commit --> Apply: Committed
+        Apply --> Active: Response
+    }
+
+    Follower --> Candidate: Election timeout
+    Candidate --> Leader: Won election
+    Candidate --> Follower: Lost election
+    Candidate --> Candidate: Split vote (timeout)
+    Leader --> Follower: Higher term discovered
+
+    note right of Leader
+        Only leader handles writes
+        All writes go through Raft log
+        Committed = majority acknowledged
+    end note
+
+    note left of Follower
+        Follows leader
+        Replicates log
+        Can serve serializable reads
+    end note

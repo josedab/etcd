@@ -1,0 +1,75 @@
+%% etcd Architecture Overview
+%% Commit: d6bc3229d81384aed0fc03a3ddd3dccfef092048
+
+graph TB
+    subgraph Clients
+        C1[etcdctl]
+        C2[Go Client]
+        C3[K8s API Server]
+    end
+
+    subgraph "etcd Server"
+        subgraph "API Layer"
+            GRPC[gRPC Server<br/>v3rpc/]
+            HTTP[HTTP Server<br/>Legacy v2]
+        end
+
+        subgraph "Server Core"
+            SERVER[EtcdServer<br/>etcdserver/]
+            APPLY[Applier<br/>apply/]
+            AUTH[Auth<br/>auth/]
+            LEASE[Lease<br/>lease/]
+        end
+
+        subgraph "Consensus"
+            RAFT[Raft Node<br/>go.etcd.io/raft]
+            TRANSPORT[Raft HTTP<br/>rafthttp/]
+        end
+
+        subgraph "Storage Layer"
+            MVCC[MVCC Store<br/>mvcc/]
+            WAL[Write-Ahead Log<br/>wal/]
+            BACKEND[Backend<br/>BoltDB]
+        end
+    end
+
+    subgraph "Peer Cluster"
+        PEER1[Peer 1]
+        PEER2[Peer 2]
+    end
+
+    %% Client connections
+    C1 --> GRPC
+    C2 --> GRPC
+    C3 --> GRPC
+
+    %% Internal flow
+    GRPC --> SERVER
+    HTTP --> SERVER
+    SERVER --> APPLY
+    SERVER --> AUTH
+    SERVER --> LEASE
+
+    %% Consensus flow
+    SERVER --> RAFT
+    RAFT --> TRANSPORT
+    TRANSPORT --> PEER1
+    TRANSPORT --> PEER2
+
+    %% Storage flow
+    APPLY --> MVCC
+    RAFT --> WAL
+    MVCC --> BACKEND
+
+    %% Styling
+    classDef client fill:#e1f5fe,stroke:#01579b
+    classDef api fill:#fff3e0,stroke:#e65100
+    classDef core fill:#f3e5f5,stroke:#4a148c
+    classDef consensus fill:#e8f5e9,stroke:#1b5e20
+    classDef storage fill:#fce4ec,stroke:#880e4f
+
+    class C1,C2,C3 client
+    class GRPC,HTTP api
+    class SERVER,APPLY,AUTH,LEASE core
+    class RAFT,TRANSPORT consensus
+    class MVCC,WAL,BACKEND storage
