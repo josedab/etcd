@@ -84,6 +84,28 @@ The [namespace](https://godoc.org/go.etcd.io/etcd/client/v3/namespace) package p
 
 Client request size limit is configurable via `clientv3.Config.MaxCallSendMsgSize` and `MaxCallRecvMsgSize` in bytes. If none given, client request send limit defaults to 2 MiB including gRPC overhead bytes. And receive limit defaults to `math.MaxInt32`.
 
+## Request Hedging
+
+Request hedging reduces tail latency by sending duplicate requests to multiple endpoints after a configurable delay. When one endpoint is slow, a hedged request to another endpoint may complete faster.
+
+```go
+cli, err := clientv3.New(clientv3.Config{
+    Endpoints:          []string{"localhost:2379", "localhost:22379", "localhost:32379"},
+    DialTimeout:        5 * time.Second,
+    HedgingDelay:       50 * time.Millisecond, // Send hedge after 50ms
+    HedgingMaxRequests: 2,                     // At most 2 concurrent requests
+})
+```
+
+**Configuration:**
+- `HedgingDelay`: Time to wait before sending a hedged request (default: 0, disabled)
+- `HedgingMaxRequests`: Maximum concurrent requests including the original (default: 2)
+
+**Important notes:**
+- Hedging only applies to read-only operations (Get, MemberList, Status, etc.)
+- Mutable operations (Put, Delete, Txn) are never hedged to preserve consistency
+- Set `HedgingDelay` to 0 to disable hedging (default)
+
 ## Examples
 
 More code [examples](https://github.com/etcd-io/etcd/tree/main/tests/integration/clientv3/examples) can be found at [GoDoc](https://pkg.go.dev/go.etcd.io/etcd/client/v3).

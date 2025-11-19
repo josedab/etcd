@@ -102,6 +102,16 @@ type Config struct {
 	// BackoffJitterFraction is the jitter fraction to randomize backoff wait time.
 	BackoffJitterFraction float64 `json:"backoff-jitter-fraction"`
 
+	// HedgingDelay is the time to wait before sending a hedged request to another endpoint.
+	// Hedging helps reduce tail latency by sending duplicate requests to multiple endpoints.
+	// Zero disables hedging. Default: 0 (disabled).
+	// Only applies to read-only operations (Range, LeaseTimeToLive, MemberList, Status).
+	HedgingDelay time.Duration `json:"hedging-delay"`
+
+	// HedgingMaxRequests is the maximum number of hedged requests to send concurrently.
+	// Default: 2 (original + 1 hedge). Must be at least 1.
+	HedgingMaxRequests int `json:"hedging-max-requests"`
+
 	// TODO: support custom balancer picker
 }
 

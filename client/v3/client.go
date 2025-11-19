@@ -268,11 +268,24 @@ func (c *Client) dialSetupOpts(creds grpccredentials.TransportCredentials, dopts
 	// TODO: Replace all of clientv3/retry.go with RetryPolicy:
 	// https://github.com/grpc/grpc-proto/blob/cdd9ed5c3d3f87aef62f373b93361cf7bddc620d/grpc/service_config/service_config.proto#L130
 	rrBackoff := withBackoff(c.roundRobinQuorumBackoff(backoffWaitBetween, backoffJitterFraction))
+
+	// Build unary interceptor chain: hedging -> retry
+	// Hedging sends duplicate requests to reduce tail latency,
+	// and each hedged request can be retried by the retry interceptor.
+	retryInterceptor := c.unaryClientInterceptor(withMax(unaryMaxRetries), rrBackoff)
+	var unaryInterceptor grpc.UnaryClientInterceptor
+	if c.cfg.HedgingDelay > 0 {
+		// Chain hedging (outer) with retry (inner)
+		unaryInterceptor = chainUnaryInterceptors(c.hedgingInterceptor(), retryInterceptor)
+	} else {
+		unaryInterceptor = retryInterceptor
+	}
+
 	opts = append(opts,
 		// Disable stream retry by default since go-grpc-middleware/retry does not support client streams.
 		// Streams that are safe to retry are enabled individually.
 		grpc.WithStreamInterceptor(c.streamClientInterceptor(withMax(0), rrBackoff)),
-		grpc.WithUnaryInterceptor(c.unaryClientInterceptor(withMax(unaryMaxRetries), rrBackoff)),
+		grpc.WithUnaryInterceptor(unaryInterceptor),
 	)
 
 	return opts
