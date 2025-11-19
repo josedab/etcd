@@ -13,4 +13,19 @@
 // limitations under the License.
 
 // Package etcdserver defines how etcd servers interact and store their states.
+//
+// # Package Structure
+//
+// The etcdserver package is organized into several modules for better maintainability:
+//
+//   - server.go: Main EtcdServer struct and lifecycle coordination
+//   - raft.go: Raft node wrapper and message processing
+//   - v3_server.go: V3 API request handling
+//   - linearizable.go: Linearizable read handling and coordination
+//   - snapshot_mgr.go: Snapshot creation, application, and compaction
+//   - interfaces.go: Interface definitions for module boundaries
+//   - metrics.go: Prometheus metrics
+//
+// This modular structure improves testability and reduces cognitive load
+// when working with the codebase.
 package etcdserver
